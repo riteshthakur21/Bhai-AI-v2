@@ -1,0 +1,15 @@
+groq
+SpeechRecognition
+edge-tts
+pyautogui
+pygetwindow
+psutil
+selenium
+webdriver-manager
+Pillow
+pdfplumber
+pygame
+pyperclip
+python-dotenv
+requests
+difflib
