@@ -1,4 +1,6 @@
 import time
+from datetime import datetime
+from pathlib import Path
 from urllib.parse import quote_plus
 
 from selenium import webdriver
@@ -7,6 +9,13 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
+
+from config import SCREENSHOTS_DIR
+
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
 
 _driver = None
 
@@ -18,8 +27,12 @@ def _get_driver():
 
     options = Options()
     options.add_argument("--start-maximized")
+    options.add_argument(f"--user-agent={USER_AGENT}")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
     service = Service(ChromeDriverManager().install())
     _driver = webdriver.Chrome(service=service, options=options)
+    _driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     return _driver
 
 
@@ -54,14 +67,14 @@ def _extract_result_from_card(card):
     return title, url, snippet
 
 
-def search(query):
+def search_web(query: str) -> str:
     try:
         if not query:
             return "Search query de bhai."
 
         driver = _get_driver()
         driver.get(f"https://duckduckgo.com/?q={quote_plus(query)}")
-        time.sleep(3)
+        time.sleep(2)
 
         cards = driver.find_elements(By.CSS_SELECTOR, "article[data-testid='result']")
         if not cards:
@@ -82,12 +95,12 @@ def search(query):
         for i, (title, url, snippet) in enumerate(rows, start=1):
             lines.append(f"{i}. {title}\n{url}\n{snippet}")
 
-        return "Le bhai top results:\n\n" + "\n\n".join(lines)
+        return "Top results mil gaye bhai:\n\n" + "\n\n".join(lines)
     except Exception as err:
         return f"Arre bhai browser search mein gadbad: {err}"
 
 
-def open_url(url):
+def open_url(url: str) -> str:
     try:
         if not url:
             return "URL de bhai."
@@ -99,6 +112,27 @@ def open_url(url):
         driver.get(final_url)
         time.sleep(1)
         title = driver.title or "Untitled"
-        return f"Site khul gayi bhai. Page title: {title}"
+        return f"Site khul gayi bhai. Title: {title}"
     except Exception as err:
         return f"Arre bhai URL kholne mein gadbad: {err}"
+
+
+def take_screenshot(url: str) -> str:
+    try:
+        if not url:
+            return "Screenshot ke liye URL de bhai."
+
+        SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+        file_path = SCREENSHOTS_DIR / f"web-shot-{datetime.now().strftime('%Y%m%d-%H%M%S')}.png"
+
+        driver = _get_driver()
+        open_url(url)
+        time.sleep(1)
+        driver.save_screenshot(str(file_path))
+        return f"Web screenshot save kar diya bhai: {file_path}"
+    except Exception as err:
+        return f"Arre bhai web screenshot mein gadbad: {err}"
+
+
+def search(query: str) -> str:
+    return search_web(query)

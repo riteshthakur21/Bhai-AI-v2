@@ -2,7 +2,6 @@ import base64
 import difflib
 import os
 import subprocess
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -237,6 +236,43 @@ def keyboard_type(text: str, press_enter=False) -> str:
         return f"Type kar diya bhai: '{text[:50]}{'...' if len(text) > 50 else ''}'"
     except Exception as e:
         return f"Type error: {e}"
+
+
+def copy_to_clipboard(text: str) -> str:
+    try:
+        pyperclip.copy(text or "")
+        return "Clipboard mein copy kar diya bhai."
+    except Exception as e:
+        return f"Arre bhai clipboard copy error: {e}"
+
+
+def get_clipboard() -> str:
+    try:
+        content = pyperclip.paste()
+        if not content:
+            return "Clipboard abhi khali hai bhai."
+        return f"Clipboard mein ye hai bhai: {content}"
+    except Exception as e:
+        return f"Arre bhai clipboard read error: {e}"
+
+
+def get_system_info() -> str:
+    try:
+        cpu = psutil.cpu_percent(interval=0.5)
+        vm = psutil.virtual_memory()
+        battery = psutil.sensors_battery()
+        battery_text = (
+            f"{battery.percent}% {'(charging)' if battery.power_plugged else '(on battery)'}"
+            if battery
+            else "battery info available nahi hai"
+        )
+        return (
+            f"System info bhai: CPU {cpu}%, RAM {vm.percent}% "
+            f"({round(vm.used / (1024 ** 3), 1)}GB/{round(vm.total / (1024 ** 3), 1)}GB), "
+            f"Battery {battery_text}."
+        )
+    except Exception as e:
+        return f"Arre bhai system info nikalne mein error: {e}"
 
 
 # ─── KEY PRESS ───────────────────────────────────────────────────────────────

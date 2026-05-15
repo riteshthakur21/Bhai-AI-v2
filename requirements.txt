@@ -12,4 +12,3 @@ pygame
 pyperclip
 python-dotenv
 requests
-difflib

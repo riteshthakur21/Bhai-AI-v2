@@ -9,15 +9,16 @@ Bhai AI v2 ek **Python voice-first desktop assistant** hai jo Hinglish mein baat
 
 ## Features
 
-- 🎤 **Voice input** (SpeechRecognition; Hindi/English fallback)
+- 🎤 **Voice input** (SpeechRecognition; wake word: **Hey Bhai**)
 - 🔊 **Voice output** (Edge TTS + pygame playback)
-- 🧠 **Hinglish AI chat** via Groq (`llama-3.3-70b-versatile`)
+- 🧠 **LLM-based intent detection** via Groq (JSON intent router, no regex)
 - 🌐 **Browser automation** (DuckDuckGo search + URL open using Selenium)
 - 🖥️ **Desktop control** (open/close apps, type text, screenshot, volume)
 - 👀 **Screen analysis** (screenshot + Groq vision model)
 - 📄 **PDF summary** support
 - 🖼️ **Image analysis** support (PNG/JPG/JPEG)
-- 📲 **WhatsApp message send** via local Node API bridge (`http://localhost:3001/send`)
+- 📲 **WhatsApp message/file send** via local Node API bridge (`http://localhost:3001`)
+- 🧠 **Persistent memory** (`memory.json`) for prefs + last 20 turns
 - 📝 **Typed fallback input** when mic is unavailable
 
 ## Project Structure
@@ -29,13 +30,14 @@ bhai-v2/
 ├─ config.py                   # Loads GROQ_API_KEY from .env
 ├─ requirements.txt            # Python dependencies list
 ├─ .env                        # Local environment variables
+├─ memory.json                 # Persistent memory (prefs + recent history)
 └─ tools/
    ├─ __init__.py              # Tools package marker (currently empty)
    ├─ voice.py                 # Speech-to-text + text-to-speech helpers
    ├─ browser.py               # Selenium browser search/open utilities
    ├─ desktop.py               # App/system/keyboard/mouse/screenshot controls
    ├─ file_reader.py           # PDF + image analysis with Groq
-   └─ whatsapp.py              # WhatsApp send via local HTTP bridge server
+   └─ whatsapp.py              # WhatsApp send message/file via local HTTP bridge
 ```
 
 ## Prerequisites
@@ -146,8 +148,8 @@ python main.py
 ## Known Limitations
 
 - WhatsApp v2 mein direct automation nahi hai; local Node server (`localhost:3001/send`) mandatory hai.
-- Intent parsing regex-based hai, toh phrasing mismatch par command miss ho sakta hai.
-- `tools.voice.listen_for_wake_word()` exists, but main loop currently continuous listening mode use karta hai.
+- Intent detection fully LLM-based hai, so stable output ke liye Groq API required hai.
+- WhatsApp file send endpoint (`/send-file`) local Node bridge mein implemented hona chahiye.
 - Desktop automation Windows-oriented commands/maps pe tuned hai.
 
 ## Future Plans
