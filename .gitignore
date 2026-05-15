@@ -1,1 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
 .env
+.env.local
+
+# Node (bhai-ai v1 ke liye)
+node_modules/
+.wwebjs_auth/
+
+# Misc
+.DS_Store
+screenshots/
