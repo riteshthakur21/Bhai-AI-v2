@@ -3,158 +3,85 @@
 ![Language](https://img.shields.io/badge/Language-Python-3776AB?logo=python&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.13%2B-3776AB?logo=python&logoColor=white)
 
-## What is Bhai AI?
+Bhai AI v2 ek **Python voice-first desktop assistant** hai jo Hinglish mein baat karta hai aur real machine actions perform karta hai. Ye aapka desktop automation companion hai jo casual aur funny Hinglish tone mein interact karta hai.
 
-Bhai AI v2 ek **Python voice-first desktop assistant** hai jo Hinglish mein baat karta hai aur real machine actions bhi perform karta hai—browser search/open, app open/close, screenshot, volume control, WhatsApp send (bridge API), file read/summarize, aur normal AI chat.
-
-## Features
-
-- 🎤 **Voice input** (SpeechRecognition; wake word: **Hey Bhai**)
-- 🔊 **Voice output** (Edge TTS + pygame playback)
-- 🧠 **LLM-based intent detection** via Groq (JSON intent router, no regex)
-- 🌐 **Browser automation** (DuckDuckGo search + URL open using Selenium)
-- 🖥️ **Desktop control** (open/close apps, type text, screenshot, volume)
-- 👀 **Screen analysis** (screenshot + Groq vision model)
-- 📄 **PDF summary** support
-- 🖼️ **Image analysis** support (PNG/JPG/JPEG)
-- 📲 **WhatsApp message/file send** via local Node API bridge (`http://localhost:3001`)
-- 🧠 **Persistent memory** (`memory.json`) for prefs + last 20 turns
-- 📝 **Typed fallback input** when mic is unavailable
-
-## Project Structure
+## 🚀 Startup Flow
 
 ```text
-bhai-v2/
-├─ main.py                     # Runtime loop (listen -> intent -> reply -> speak)
-├─ agent.py                    # Intent parser + orchestrator for all tools
-├─ config.py                   # Loads GROQ_API_KEY from .env
-├─ requirements.txt            # Python dependencies list
-├─ .env                        # Local environment variables
-├─ memory.json                 # Persistent memory (prefs + recent history)
-└─ tools/
-   ├─ __init__.py              # Tools package marker (currently empty)
-   ├─ voice.py                 # Speech-to-text + text-to-speech helpers
-   ├─ browser.py               # Selenium browser search/open utilities
-   ├─ desktop.py               # App/system/keyboard/mouse/screenshot controls
-   ├─ file_reader.py           # PDF + image analysis with Groq
-   └─ whatsapp.py              # WhatsApp send message/file via local HTTP bridge
+[Startup]
+   |
+   ▼
+[Health Checks] 🔍
+   |-- Groq API (Fatal if fails)
+   |-- Mic Check (Fallback to Text if fails)
+   |-- WhatsApp Server Check
+   |-- Chrome/Selenium Check
+   |
+   ▼
+[Wait for Wake Word] 🎤 ("Hey Bhai", "Bhai", etc.)
+   |
+   ▼
+[Listen to Command] 👂
+   |
+   ▼
+[Intent Detection] 🧠 (Groq LLM)
+   |
+   ▼
+[Execute Action] ⚙️ (Tools)
+   |
+   ▼
+[Hinglish Reply] 🔊 (Edge-TTS)
 ```
 
-## Prerequisites
+## 🛠️ Voice Commands
 
-1. Python 3.13+ (project was executed with 3.13 artifacts)
-2. pip
-3. Chrome browser (for Selenium)
-4. Audio input/output setup (mic + speaker)
-5. Groq API key
-6. For WhatsApp command support: `bhai-ai` v1 server running on port `3001`
+| Category | Commands (Examples) | Action |
+|---|---|---|
+| **Chat** | `kaisa hai bhai?`, `joke suna` | Normal AI conversation |
+| **Browser** | `DSA search kar`, `youtube.com khol` | Web search & navigation |
+| **Desktop** | `notepad khol`, `chrome band kar` | App launch & termination |
+| **System** | `volume badhao`, `mute kar de` | Volume & system control |
+| **Vision** | `screen pe kya hai`, `screenshot le` | Screen analysis & capture |
+| **WhatsApp** | `Rahul ko hi bhej` | Message/File via local bridge |
+| **Files** | `notes.pdf summarize kar` | PDF/Image reading |
 
-**Dependencies (`requirements.txt`)**
+## ⚙️ .env Configuration
 
-- groq
-- SpeechRecognition
-- edge-tts
-- pyautogui
-- pygetwindow
-- psutil
-- selenium
-- webdriver-manager
-- Pillow
-- pdfplumber
-- pygame
-- pyperclip
-- python-dotenv
-- requests
-- difflib
+Root directory mein `.env` file banaye:
 
-## Installation & Setup
+```env
+GROQ_API_KEY=gsk_your_key_here
+GROQ_CHAT_MODEL=llama-3.3-70b-versatile
+GROQ_VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+BHAI_VOICE_MODE=hybrid
+BHAI_ALWAYS_LISTENING=true
+BHAI_WAKE_WORD=hey bhai
+```
 
-1. Create and activate virtual environment (recommended):
+## ⚠️ Troubleshooting
+
+- **Mic nahi chal raha?**
+  - Check hardware connection. Failsafe: Bhai automatically **Text Mode** switch kar lega.
+- **WhatsApp Offline?**
+  - Make sure `bhai-ai` v1 folder mein `npm start` chal raha hai (Port 3001).
+- **Groq Error?**
+  - Verify `GROQ_API_KEY` in `.env`. Key expired ya galat hone pe startup fail hoga.
+- **Chrome Error?**
+  - ChromeDriver automatically update hota hai, but manual install ke liye Chrome version check karein.
+
+## 📦 Installation
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-```
-
-2. Install dependencies:
-
-```bash
 pip install -r requirements.txt
-```
-
-3. Create/update `.env`:
-
-```env
-GROQ_API_KEY=your_groq_api_key_here
-```
-
-4. (Optional but needed for WhatsApp messages) Start v1 bridge server:
-
-```bash
-cd ..\bhai-ai
-node server.js
-```
-
-## How to Run
-
-```bash
 python main.py
 ```
 
-## How to Use (Examples)
+## 📜 Special Commands
 
-**Browser**
-
-- `chrome pe DSA search kar`
-- `youtube.com khol`
-- `google website khol`
-
-**Desktop**
-
-- `notepad app khol`
-- `chrome band kar`
-- `type kar bhai ye line paste kar de`
-- `screenshot le`
-- `screen dekh aur bata`
-- `volume up` / `volume down` / `mute`
-
-**WhatsApp**
-
-- `RiyaDi ko msg kar hi`
-- `RiyaDi ko kal milte hain bhej`
-
-**File Reader**
-
-- `notes.pdf summarize kar`
-- `photo.jpg padh`
-
-## Tools & Tech Stack
-
-| Tool | Purpose |
-|---|---|
-| Python | Core runtime |
-| Groq SDK (`groq`) | Chat + vision summarization |
-| SpeechRecognition | Voice input |
-| edge-tts | Text-to-speech generation |
-| pygame | Audio playback |
-| Selenium + webdriver-manager | Browser automation |
-| pyautogui | Keyboard/mouse/volume controls |
-| psutil | Process management for app closing |
-| Pillow/ImageGrab | Screenshot capture |
-| pdfplumber | PDF text extraction |
-| requests | WhatsApp bridge API calls |
-| python-dotenv | Environment variable loading |
-
-## Known Limitations
-
-- WhatsApp v2 mein direct automation nahi hai; local Node server (`localhost:3001/send`) mandatory hai.
-- Intent detection fully LLM-based hai, so stable output ke liye Groq API required hai.
-- WhatsApp file send endpoint (`/send-file`) local Node bridge mein implemented hona chahiye.
-- Desktop automation Windows-oriented commands/maps pe tuned hai.
-
-## Future Plans
-
-- 🧷 Direct WhatsApp integration without external bridge
-- 🗣️ Stable wake-word driven conversation mode
-- 🧠 Richer intent handling for natural/free-form Hinglish
-- 🧭 Safer guardrails for desktop/system actions
+- `help`: Saare features aur commands ki list.
+- `clear`: Purani conversation history delete karein.
+- `memory`: Dekhein Bhai ko aapke baare mein kya pata hai.
+- `status`: Diagnostic checks dobara run karein.
+- `bye` / `exit`: Assistant band karne ke liye.

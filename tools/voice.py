@@ -16,6 +16,8 @@ LISTEN_TIMEOUT = 6
 PHRASE_LIMIT = 12
 ENERGY_THRESHOLD = 300
 
+WAKE_WORDS = ["hey bhai", "bhai", "aye bhai", "bhai sun", "hello bhai", "ok bhai"]
+
 _mixer_ready = False
 _recognizer = None
 _mic_available = None
@@ -28,10 +30,6 @@ def is_mic_available():
     try:
         mics = sr.Microphone.list_microphone_names()
         _mic_available = len(mics) > 0
-        if _mic_available:
-            print(f"Mic connected bhai: {mics[0]}")
-        else:
-            print("Koi mic nahi mila bhai.")
     except Exception:
         _mic_available = False
     return _mic_available
@@ -60,13 +58,13 @@ def _speech_to_text(audio) -> str | None:
             return None
 
 
-def listen(prompt_text="Sun raha hu..."):
-    global _mic_available
+def listen(prompt_text="Sun raha hu bhai..."):
     if not is_mic_available():
+        print("  [Mic nahi hai — type kar]")
         return None
 
     recognizer = _get_recognizer()
-    print(prompt_text)
+    print(f"  🎤 {prompt_text}")
 
     try:
         with sr.Microphone() as source:
@@ -78,19 +76,18 @@ def listen(prompt_text="Sun raha hu..."):
                     phrase_time_limit=PHRASE_LIMIT,
                 )
             except sr.WaitTimeoutError:
+                print("  [Kuch sunai nahi diya]")
                 return None
         return _speech_to_text(audio)
     except OSError as err:
-        print(f"Mic access error: {err}")
-        _mic_available = False
+        print(f"  [Mic access error: {err}]")
         return None
     except Exception as err:
-        print(f"Listen error: {err}")
+        print(f"  [Listen error: {err}]")
         return None
 
 
 def listen_for_wake_word():
-    global _mic_available
     if not is_mic_available():
         return False
 
@@ -101,13 +98,9 @@ def listen_for_wake_word():
         heard = _speech_to_text(audio)
         if not heard:
             return False
-        normalized = heard.lower()
-        return WAKE_WORD in normalized or "bhai" in normalized
+        normalized = heard.lower().strip()
+        return any(w in normalized for w in WAKE_WORDS)
     except sr.WaitTimeoutError:
-        return False
-    except OSError as err:
-        print(f"Wake word mic error: {err}")
-        _mic_available = False
         return False
     except Exception:
         return False
@@ -130,11 +123,27 @@ async def _generate_tts(text, file_path, voice=VOICE):
         await communicator.save(file_path)
 
 
+def _truncate_for_voice(text: str, max_chars=200) -> str:
+    """Long response ka sirf important part bolna hai bhai."""
+    if not text:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    # First 2 sentences nikalo
+    sentences = text.replace('।', '.').split('.')
+    short = '. '.join([s.strip() for s in sentences[:2] if s.strip()]).strip()
+    if short:
+        if not short.endswith('.'):
+            short += '.'
+        return short
+    return text[:max_chars] + "..."
+
+
 def speak(text, blocking=True):
     if not text or not text.strip():
         return
 
-    tts_text = text if len(text) <= 500 else text[:500] + "..."
+    tts_text = _truncate_for_voice(text)
 
     def _play():
         temp_file = None

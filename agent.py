@@ -7,14 +7,22 @@ from groq import Groq
 from config import GROQ_API_KEY, GROQ_CHAT_MODEL, MEMORY_FILE, SYSTEM_PROMPT
 from tools import browser, desktop, file_reader, whatsapp
 
+# Saare intents update kar diye bhai taaki LLM ko pata chale kya kya kar sakta hai
 VALID_INTENTS = {
     "whatsapp_message",
     "browser_search",
     "open_app",
+    "close_app",
     "file_read",
     "screenshot",
+    "analyze_screen",
     "system_info",
     "clipboard",
+    "volume_control",
+    "press_key",
+    "mouse_click",
+    "system_action",
+    "focus_window",
     "normal_chat",
 }
 
@@ -71,27 +79,39 @@ class BhaiAgent:
         end = payload.rfind("}")
         if start == -1 or end == -1 or end < start:
             return {}
-        return json.loads(payload[start : end + 1])
+        try:
+            return json.loads(payload[start : end + 1])
+        except Exception:
+            return {}
 
     def _detect_intent_llm(self, user_text: str) -> Dict[str, Any]:
         if not self.client:
             return {"intent": "normal_chat", "params": {}}
 
+        # Intent detection prompt ko aur powerful banaya bhai with examples
         schema_text = (
             'Return strict JSON only: {"intent":"...", "params":{...}}. '
-            "Valid intents only: whatsapp_message, browser_search, open_app, file_read, "
-            "screenshot, system_info, clipboard, normal_chat. "
-            "For browser actions use intent browser_search and params.action as search_web|open_url. "
-            "For file actions use intent file_read and params.action as read_pdf|read_image|list_files. "
-            "For whatsapp use params.action as send_message|send_file. "
-            "For clipboard use params.action as copy|get. "
+            f"Valid intents only: {', '.join(VALID_INTENTS)}. "
+            "\nExamples for intents:\n"
+            "- close_app: params.app_name -> 'Spotify band karo'\n"
+            "- volume_control: params.action (up|down|mute|unmute) -> 'volume badhao', 'mute karo'\n"
+            "- analyze_screen: params.question -> 'screen pe kya hai'\n"
+            "- press_key: params.key -> 'ctrl+c', 'alt+tab', 'win+d'\n"
+            "- mouse_click: params.x, params.y, params.button (left|right), params.double (bool) -> 'yahan click karo'\n"
+            "- system_action: params.action (lock|sleep|restart|shutdown) -> 'PC lock karo', 'so ja', 'restart karo'\n"
+            "- focus_window: params.app_name -> 'Chrome pe focus karo'\n"
+            "- screenshot: params.url (optional) -> 'screenshot lo'\n"
+            "- browser_search: params.action (search_web|open_url), params.query, params.url\n"
+            "- whatsapp_message: params.action (send_message|send_file), params.contact, params.message, params.filepath\n"
+            "- file_read: params.action (read_pdf|read_image|list_files|read_file), params.path, params.folder\n"
+            "- clipboard: params.action (copy|get), params.text\n"
             "Never return markdown."
         )
 
         result = self.client.chat.completions.create(
             model=GROQ_CHAT_MODEL,
             messages=[
-                {"role": "system", "content": "You are an intent parser for Bhai AI."},
+                {"role": "system", "content": "You are an intent parser for Bhai AI. Detect exactly what the user wants to do based on the input."},
                 {"role": "user", "content": f"{schema_text}\n\nInput: {user_text}"},
             ],
             response_format={"type": "json_object"},
@@ -104,7 +124,7 @@ class BhaiAgent:
         params = parsed.get("params") if isinstance(parsed.get("params"), dict) else {}
         return {"intent": intent, "params": params}
 
-    def detectIntent(self, text: str) -> Dict[str, Any]:  # Backward compatibility
+    def detectIntent(self, text: str) -> Dict[str, Any]:
         return self._detect_intent_llm(text)
 
     def _update_preferences(self, user_text: str):
@@ -145,13 +165,44 @@ class BhaiAgent:
         }
         self._save_memory()
 
+    def _summarize_search_results(self, query: str, raw_results: str) -> str:
+        # Search results ko chhota aur crisp banane ke liye bhai taaki user ko zyada na padhna pade
+        if not self.client:
+            return raw_results
+        result = self.client.chat.completions.create(
+            model=GROQ_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": "Tu Bhai hai. Search results ko 3-4 line Hinglish summary mein de aur important links bhi include kar."},
+                {"role": "user", "content": f"Query: {query}\n\nResults:\n{raw_results}"}
+            ],
+            temperature=0.5,
+        )
+        summary = (result.choices[0].message.content or "").strip()
+        return f"{summary}\n\n---\n{raw_results}"
+
     def _chat_with_groq(self, text: str) -> str:
         if not self.client:
             return "Arre bhai GROQ_API_KEY missing hai, .env set kar."
 
         prefs = self.memory.get("user_preferences", {})
+        naam = prefs.get("naam", "")
+        contacts = prefs.get("common_contacts", [])
+        
+        # User details handle kar rahe hain bhai context ke liye taaki personal feel aaye
+        context_instructions = f"User ka naam: {naam if naam else 'Anjaan'}. "
+        if contacts:
+            context_instructions += f"User ke common contacts: {', '.join(contacts)}. Inhe use karke suggestions de sakte ho WhatsApp ke liye. "
+        if naam:
+            context_instructions += f"Hamesha koshish karo ki user ko unke naam '{naam}' se address karo kabhi kabhi. "
+
         memory_block = f"User preferences: {json.dumps(prefs, ensure_ascii=False)}"
-        messages = [{"role": "system", "content": self.system_prompt}, {"role": "system", "content": memory_block}, *self.history]
+        dynamic_system = f"{self.system_prompt}\n\n{context_instructions}"
+
+        messages = [
+            {"role": "system", "content": dynamic_system},
+            {"role": "system", "content": memory_block},
+            *self.history
+        ]
         messages.append({"role": "user", "content": text})
 
         result = self.client.chat.completions.create(
@@ -178,15 +229,30 @@ class BhaiAgent:
             return f"Arre bhai intent parse mein issue aa gaya: {err}"
 
         try:
+            # 1. App control (Open/Close/Focus)
             if intent == "open_app":
                 return desktop.open_app(params.get("app_name") or params.get("app") or text)
 
+            if intent == "close_app":
+                # Spotify band karo types commands ke liye
+                return desktop.close_app(params.get("app_name") or text)
+
+            if intent == "focus_window":
+                # Window switch ya focus karne ke liye
+                return desktop.focus_window(params.get("app_name") or text)
+
+            # 2. Browser logic
             if intent == "browser_search":
                 action = (params.get("action") or "search_web").strip().lower()
                 if action == "open_url":
                     return browser.open_url(params.get("url"))
-                return browser.search_web(params.get("query") or text)
+                
+                query = params.get("query") or text
+                raw_results = browser.search_web(query)
+                # Results summarize karke return karenge bhai
+                return self._summarize_search_results(query, raw_results)
 
+            # 3. WhatsApp automation
             if intent == "whatsapp_message":
                 action = (params.get("action") or "send_message").strip().lower()
                 if action == "send_file":
@@ -200,6 +266,7 @@ class BhaiAgent:
                     message=params.get("message"),
                 )
 
+            # 4. File reading & listing
             if intent == "file_read":
                 action = (params.get("action") or "").strip().lower()
                 if action == "list_files":
@@ -211,6 +278,7 @@ class BhaiAgent:
                     return file_reader.read_image(path)
                 return file_reader.read_file(path)
 
+            # 5. Vision / Screen Analysis
             if intent == "screenshot":
                 target_url = params.get("url")
                 if target_url:
@@ -218,6 +286,12 @@ class BhaiAgent:
                 shot_path = desktop.take_screenshot()
                 return shot_path if shot_path.startswith("Arre bhai") else f"Screenshot save kar diya: {shot_path}"
 
+            if intent == "analyze_screen":
+                # Vision model use karke screen analyze karna
+                question = params.get("question", "Is screenshot mein kya dikh raha hai? Hinglish mein bata.")
+                return desktop.analyze_screen(question)
+
+            # 6. System & Desktop tools (Volume, Keys, Mouse, etc.)
             if intent == "system_info":
                 return desktop.get_system_info()
 
@@ -227,9 +301,33 @@ class BhaiAgent:
                     return desktop.copy_to_clipboard(params.get("text", ""))
                 return desktop.get_clipboard()
 
+            if intent == "volume_control":
+                # Volume control functions call kar rahe hain
+                return desktop.volume_control(params.get("action", "up"))
+
+            if intent == "press_key":
+                # Keyboard shortcuts types actions
+                return desktop.press_key(params.get("key", ""))
+
+            if intent == "mouse_click":
+                # Mouse interaction
+                return desktop.mouse_click(
+                    x=params.get("x"),
+                    y=params.get("y"),
+                    button=params.get("button", "left"),
+                    double=params.get("double", False)
+                )
+
+            if intent == "system_action":
+                # Lock/Sleep/Restart/Shutdown
+                return desktop.system_action(params.get("action", ""))
+
+            # 7. Normal Chat (Fallback)
             return self._chat_with_groq(text)
+
         except Exception as err:
             return f"Arre bhai action chalane mein gadbad ho gayi: {err}"
 
-    def handleInput(self, text: str) -> str:  # Backward compatibility
+    def handleInput(self, text: str) -> str:
+        # Backward compatibility ke liye bhai
         return self.handle_input(text)

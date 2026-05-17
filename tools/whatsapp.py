@@ -5,9 +5,25 @@ import requests
 BASE_URL = "http://localhost:3001"
 SEND_MESSAGE_ENDPOINT = f"{BASE_URL}/send"
 SEND_FILE_ENDPOINT = f"{BASE_URL}/send-file"
+STATUS_ENDPOINT = f"{BASE_URL}/status"
+
+
+def is_server_online() -> bool:
+    """Check karo ki WhatsApp bridge server online hai ya nahi."""
+    try:
+        r = requests.get(STATUS_ENDPOINT, timeout=2)
+        return r.status_code == 200
+    except Exception:
+        return False
 
 
 def send_message(contact: str, message: str) -> str:
+    if not is_server_online():
+        return (
+            "Arre bhai WhatsApp server offline hai! 😅\n"
+            "bhai-ai folder mein jaake 'npm start' chala phir dobara bol."
+        )
+
     try:
         if not contact or not message:
             return "Contact aur message dono chahiye bhai."
@@ -29,6 +45,12 @@ def send_message(contact: str, message: str) -> str:
 
 
 def send_file(contact: str, filepath: str, caption: str = "") -> str:
+    if not is_server_online():
+        return (
+            "Arre bhai WhatsApp server offline hai! 😅\n"
+            "bhai-ai folder mein jaake 'npm start' chala phir dobara bol."
+        )
+
     try:
         if not contact or not filepath:
             return "Contact aur file path dono de bhai."
